@@ -6,6 +6,8 @@ interface RulerCanvasProps {
   sampleRate: number;
   tempo: number;
   timeSignature: [number, number];
+  loopRange: [number, number];
+  onSeek: (time: number) => void;
 }
 
 export const RulerCanvas: React.FC<RulerCanvasProps> = ({
@@ -14,6 +16,8 @@ export const RulerCanvas: React.FC<RulerCanvasProps> = ({
   sampleRate,
   tempo,
   timeSignature,
+  loopRange,
+  onSeek,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -73,14 +77,29 @@ export const RulerCanvas: React.FC<RulerCanvasProps> = ({
         }
       }
     }
-  }, [zoomRange, totalSamples, sampleRate, tempo, timeSignature]);
+
+    // No loop locators here anymore, they are in SlicerCanvas
+  }, [zoomRange, totalSamples, sampleRate, tempo, timeSignature, loopRange]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas || sampleRate <= 0) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const [startRatio, endRatio] = zoomRange;
+    const visibleSamples = (endRatio - startRatio) * totalSamples;
+    const clickedSample = startRatio * totalSamples + (x / rect.width) * visibleSamples;
+    const clickedTime = clickedSample / sampleRate;
+    onSeek(clickedTime);
+  };
 
   return (
     <canvas
       ref={canvasRef}
       width={1200}
       height={24}
-      className="w-full h-[24px] bg-slate-200 border-b border-slate-300"
+      className="w-full h-[24px] bg-slate-200 border-b border-slate-300 cursor-pointer"
+      onMouseDown={handleMouseDown}
     />
   );
 };

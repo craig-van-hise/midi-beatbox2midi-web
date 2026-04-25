@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AudioProcessor } from '../lib/AudioProcessor';
 
 // We'll load the factory from the public folder
@@ -14,6 +14,7 @@ export function useHitManager() {
   const [fullAudioBuffer, setFullAudioBuffer] = useState<AudioBuffer | null>(null);
   const [engineHits, setEngineHits] = useState<any[]>([]);
   const [hitStates, setHitStates] = useState<Map<number, HitState>>(new Map());
+  const [selectedHitIndices, setSelectedHitIndices] = useState<number[]>([]);
   const [params, setParams] = useState({
     sensitivity: 0.500,
     noiseFloor: 0.02,
@@ -120,15 +121,62 @@ export function useHitManager() {
     });
   };
 
+  const batchToggleHitState = (sampleIndices: number[], type: HitState) => {
+    setHitStates(prev => {
+      const next = new Map(prev);
+      sampleIndices.forEach(idx => {
+        if (next.get(idx) === type) {
+          next.delete(idx);
+        } else {
+          next.set(idx, type);
+        }
+      });
+      return next;
+    });
+  };
+
+  const renderableHits = useMemo(() => {
+    // Start with engine hits and map their states
+    const hits = engineHits.map(h => ({
+      ...h,
+      state: hitStates.get(h.sampleIndex) || null
+    }));
+
+    // Inject persistent hits (locked or user-added) that might be missing from engineHits
+    hitStates.forEach((state, sampleIndex) => {
+      if (state === 'locked' || state === 'user-added') {
+        const exists = hits.some(h => h.sampleIndex === sampleIndex);
+        if (!exists) {
+          hits.push({
+            sampleIndex,
+            velocity: state === 'user-added' ? 1.0 : 0.8,
+            state: state
+          });
+        }
+      }
+    });
+
+    return hits.sort((a, b) => a.sampleIndex - b.sampleIndex);
+  }, [engineHits, hitStates]);
+
+  const activeHits = useMemo(() => {
+    return renderableHits.filter((h: any) => h.state !== 'muted');
+  }, [renderableHits]);
+
   return {
     audioBuffer,
     fullAudioBuffer,
     engineHits,
+    renderableHits,
+    activeHits,
     hitStates,
+    selectedHitIndices,
+    setSelectedHitIndices,
     params,
     setParams,
     loadFile,
     toggleHitState,
+    batchToggleHitState,
     processor: processorRef.current,
     sampleRate: processorRef.current?.sampleRate || 44100,
     isInitialized,

@@ -12,12 +12,12 @@ interface ControlsProps {
 
 export const Controls: React.FC<ControlsProps> = ({ params, setParams }) => {
   return (
-    <div className="glass rounded-xl p-6 mb-4 flex flex-wrap gap-8 items-end">
-      <div className="flex-1 min-w-[200px]">
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-600 mb-2">
-          <Zap size={16} className="text-cyan-500" />
+    <div className="glass rounded-xl py-2 px-4 mb-3 flex flex-wrap gap-2 items-end">
+      <div className="flex-1 min-w-[180px]">
+        <label className="flex items-center gap-2 text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+          <Zap size={14} className="text-cyan-500" />
           Sensitivity
-          <span className="ml-auto text-hit-blue">{params.sensitivity.toFixed(3)}</span>
+          <span className="ml-auto text-hit-blue font-mono">{params.sensitivity.toFixed(3)}</span>
         </label>
         <input
           type="range"
@@ -26,15 +26,15 @@ export const Controls: React.FC<ControlsProps> = ({ params, setParams }) => {
           step="0.001"
           value={params.sensitivity}
           onChange={(e) => setParams({ ...params, sensitivity: parseFloat(e.target.value) })}
-          className="w-full"
+          className="w-full accent-hit-blue h-1.5 rounded-lg appearance-none bg-slate-200 cursor-pointer"
         />
       </div>
 
-      <div className="flex-1 min-w-[200px]">
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-600 mb-2">
-          <VolumeX size={16} className="text-slate-400" />
+      <div className="flex-1 min-w-[180px]">
+        <label className="flex items-center gap-2 text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+          <VolumeX size={14} className="text-slate-400" />
           Noise Floor
-          <span className="ml-auto text-hit-blue">{params.noiseFloor.toFixed(3)}</span>
+          <span className="ml-auto text-hit-blue font-mono">{params.noiseFloor.toFixed(3)}</span>
         </label>
         <input
           type="range"
@@ -43,15 +43,15 @@ export const Controls: React.FC<ControlsProps> = ({ params, setParams }) => {
           step="0.005"
           value={params.noiseFloor}
           onChange={(e) => setParams({ ...params, noiseFloor: parseFloat(e.target.value) })}
-          className="w-full"
+          className="w-full accent-hit-blue h-1.5 rounded-lg appearance-none bg-slate-200 cursor-pointer"
         />
       </div>
 
-      <div className="flex-1 min-w-[200px]">
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-600 mb-2">
-          <Timer size={16} className="text-hit-blue" />
-          Refractory (ms)
-          <span className="ml-auto text-hit-blue">{params.refractory}ms</span>
+      <div className="flex-1 min-w-[180px]">
+        <label className="flex items-center gap-2 text-[11px] font-bold text-slate-500 mb-1 uppercase tracking-wider">
+          <Timer size={14} className="text-hit-blue" />
+          Refractory
+          <span className="ml-auto text-hit-blue font-mono">{params.refractory}ms</span>
         </label>
         <input
           type="range"
@@ -60,7 +60,7 @@ export const Controls: React.FC<ControlsProps> = ({ params, setParams }) => {
           step="1"
           value={params.refractory}
           onChange={(e) => setParams({ ...params, refractory: parseInt(e.target.value) })}
-          className="w-full"
+          className="w-full accent-hit-blue h-1.5 rounded-lg appearance-none bg-slate-200 cursor-pointer"
         />
       </div>
     </div>

@@ -1,8 +1,8 @@
 import React from 'react';
-import { MousePointer2, Pencil, Eraser, Lock } from 'lucide-react';
+import { MousePointer2, Pencil, X, Lock, Volume2 } from 'lucide-react';
 import { clsx } from 'clsx';
 
-export type Tool = 'pointer' | 'pencil' | 'eraser' | 'lock';
+export type Tool = 'pointer' | 'pencil' | 'eraser' | 'lock' | 'audition';
 
 interface ToolbarProps {
   activeTool: Tool;
@@ -13,8 +13,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool }) =
   const tools: { id: Tool; icon: any; label: string }[] = [
     { id: 'pointer', icon: MousePointer2, label: 'Select' },
     { id: 'pencil', icon: Pencil, label: 'Add' },
-    { id: 'eraser', icon: Eraser, label: 'Remove' },
+    { id: 'eraser', icon: X, label: 'Remove' },
     { id: 'lock', icon: Lock, label: 'Lock' },
+    { id: 'audition', icon: Volume2, label: 'Audition' },
   ];
 
   return (

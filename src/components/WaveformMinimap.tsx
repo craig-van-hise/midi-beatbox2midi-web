@@ -3,7 +3,7 @@ import React, { useRef, useEffect, useState } from 'react';
 interface WaveformMinimapProps {
   audioBuffer: Float32Array | null;
   zoomRange: [number, number];
-  setZoomRange: (range: [number, number]) => void;
+  setZoomRange: React.Dispatch<React.SetStateAction<[number, number]>>;
 }
 
 export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
@@ -27,7 +27,7 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
 
     // Draw Real Waveform (RMS/Peaks)
     ctx.beginPath();
-    ctx.strokeStyle = '#cbd5e1'; // slate-300
+    ctx.strokeStyle = '#0f172a'; // slate-900
     ctx.lineWidth = 1;
 
     const samplesPerPixel = audioBuffer.length / width;
@@ -63,10 +63,45 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
     ctx.lineWidth = 2;
     ctx.strokeRect(startX, 0, endX - startX, height);
 
-    // Handles
-    ctx.fillStyle = '#0066ff';
-    ctx.fillRect(startX - 2, 0, 4, height);
-    ctx.fillRect(endX - 2, 0, 4, height);
+    // Handles with Grips
+    const drawHandle = (x: number, side: 'left' | 'right') => {
+      ctx.save();
+      
+      // Vertical line
+      ctx.strokeStyle = '#0066ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+
+      // Grip Pill
+      const pillWidth = 10;
+      const pillHeight = 20;
+      const pillX = x - pillWidth / 2;
+      const pillY = (height - pillHeight) / 2;
+
+      ctx.fillStyle = '#0066ff';
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 4);
+      ctx.fill();
+
+      // 3 small horizontal lines inside pill
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1.5;
+      for (let j = 0; j < 3; j++) {
+        const lineY = pillY + 5 + j * 5;
+        ctx.beginPath();
+        ctx.moveTo(pillX + 2, lineY);
+        ctx.lineTo(pillX + pillWidth - 2, lineY);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    };
+
+    drawHandle(startX, 'left');
+    drawHandle(endX, 'right');
 
   }, [audioBuffer, zoomRange]);
 
@@ -78,7 +113,7 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
     const x = (e.clientX - rect.left) / rect.width;
     const startX = zoomRange[0];
     const endX = zoomRange[1];
-    const threshold = 10 / rect.width; // 10px threshold
+    const threshold = 15 / rect.width; // Increased threshold for larger handles
 
     let type: 'left' | 'right' | 'center' | null = null;
     if (Math.abs(x - startX) < threshold) type = 'left';
@@ -117,15 +152,15 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
   };
 
   return (
-    <div className="glass rounded-xl p-4 mb-4">
-      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Overview</h3>
+    <div className="glass rounded-xl p-2 mb-3 overflow-visible">
       <canvas
         ref={canvasRef}
         width={1200}
-        height={60}
-        className={`w-full h-[60px] rounded bg-white bg-opacity-50 transition-all ${
+        height={40}
+        className={`w-full h-[40px] rounded bg-white bg-opacity-50 transition-all ${
           isDragging ? 'cursor-grabbing' : 'cursor-grab'
         }`}
+        style={{ overflow: 'visible' }}
         onMouseDown={handleMouseDown}
       />
     </div>
