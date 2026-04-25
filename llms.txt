@@ -1,0 +1,13 @@
+# Beatbox2MIDI
+
+Comprehensive tool for slicing beatbox transients into MIDI.
+
+## Core Documentation
+- [Project State](PROJECT_STATE.md): Current architecture, status, and bug tracking.
+- [README](README.md): Project overview and quick start.
+
+## Key Source
+- [App.tsx](src/App.tsx): Root component and state coordination.
+- [AudioProcessor.js](src/lib/AudioProcessor.js): JS/WASM Bridge.
+- [useHitManager.ts](src/hooks/useHitManager.ts): Core DSP state.
+- [SlicerCanvas.tsx](src/components/SlicerCanvas.tsx): Primary UI interaction.

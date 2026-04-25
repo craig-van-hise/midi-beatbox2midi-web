@@ -1,0 +1,86 @@
+
+/Users/vv2024/Documents/Repos - vv2024/WebApps/midi/midi-beatbox2midi-web
+├── # Prompts
+|  ├── # 1.md
+|  ├── # 2.md
+|  ├── # 3.md
+|  ├── # 4.md
+|  ├── # 5.md
+|  ├── # 6.md
+|  ├── # 7.md
+|  └── xOlder
+|     ├── # Prompt for AI Studio v2.md
+|     ├── # Prompt for AI Studio.md
+|     ├── # demo HPD.md
+|     ├── # fix.md
+|     └── C++ work
+|        ├── # Sprint 3 Step 7 testing.md
+|        ├── # Sprint 3 Step 7.md
+|        ├── # Sprint 3 Step 8.md
+|        └── # Sprint 3 Step 9.md
+├── ### Product Requirements Document (PRD)- Beatbox2MIDI.md
+├── Foundational Docs
+|  ├── Beat Tracking Algorithm Research Report.pdf
+|  ├── Beatboxing Transient Detection DSP Report.pdf
+|  ├── TODO Beatbox2MIDI.md
+|  ├── UI mock ups
+|  |  ├── Beatbox2MIDI.png
+|  |  └── xOlder
+|  |     ├── Gemini_Generated_Image_5xapml5xapml5xap.png
+|  |     ├── Gemini_Generated_Image_68id3u68id3u68id.png
+|  |     ├── Gemini_Generated_Image_927y2o927y2o927y.png
+|  |     ├── Gemini_Generated_Image_fcm5uyfcm5uyfcm5.png
+|  |     ├── Gemini_Generated_Image_k8s124k8s124k8s1.png
+|  |     ├── Gemini_Generated_Image_vvyga9vvyga9vvyg.png
+|  |     └── Gemini_Generated_Image_w6t31pw6t31pw6t3.png
+|  └── math and contract.md
+├── PROJECT_CONTEXT_BUNDLE.md
+├── PROJECT_STATE.md
+├── PROJECT_TREE.txt
+├── README.md
+├── diagnostic report WASM params.md
+├── diganostic report parameter updates.md
+├── index.html
+├── llms.txt
+├── package-lock.json
+├── package.json
+├── postcss.config.js
+├── public
+|  ├── BeatboxEngine.js
+|  └── BeatboxEngine.wasm
+├── src
+|  ├── App.tsx
+|  ├── components
+|  |  ├── Controls.tsx
+|  |  ├── RulerCanvas.tsx
+|  |  ├── SlicerCanvas.tsx
+|  |  ├── Toolbar.tsx
+|  |  ├── Transport.tsx
+|  |  └── WaveformMinimap.tsx
+|  ├── hooks
+|  |  ├── useAudioPlayback.ts
+|  |  └── useHitManager.ts
+|  ├── index.css
+|  ├── lib
+|  |  └── AudioProcessor.js
+|  └── main.tsx
+├── src-cpp
+|  ├── BeatboxEngine.js
+|  ├── BeatboxEngine.wasm
+|  ├── Engine.cpp
+|  ├── Engine.h
+|  ├── Engine.o
+|  ├── EngineTests
+|  ├── EngineTests.cpp
+|  └── WasmBindings.cpp
+├── tailwind.config.js
+├── tsconfig.json
+├── tsconfig.node.json
+└── vite.config.ts
+
+directory: 415 file: 2838
+
+ignored: directory (33)
+
+
+[2K[1G
