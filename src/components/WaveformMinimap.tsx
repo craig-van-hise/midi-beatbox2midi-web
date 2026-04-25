@@ -4,15 +4,20 @@ interface WaveformMinimapProps {
   audioBuffer: Float32Array | null;
   zoomRange: [number, number];
   setZoomRange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  loopRange: [number, number];
+  sampleRate: number;
 }
 
 export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
   audioBuffer,
   zoomRange,
   setZoomRange,
+  loopRange,
+  sampleRate,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDragging, setIsDragging] = useState<'left' | 'right' | 'center' | null>(null);
+  const PADDING = 16; // Internal padding to prevent handle/locator clipping
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -23,17 +28,21 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
 
     const width = canvas.width;
     const height = canvas.height;
+    const drawWidth = width - (PADDING * 2);
     ctx.clearRect(0, 0, width, height);
+
+    // Helper to map 0-1 range to padded pixel range
+    const toX = (ratio: number) => PADDING + ratio * drawWidth;
 
     // Draw Real Waveform (RMS/Peaks)
     ctx.beginPath();
     ctx.strokeStyle = '#0f172a'; // slate-900
     ctx.lineWidth = 1;
 
-    const samplesPerPixel = audioBuffer.length / width;
+    const samplesPerPixel = audioBuffer.length / drawWidth;
     const amp = height / 2;
 
-    for (let i = 0; i < width; i++) {
+    for (let i = 0; i < drawWidth; i++) {
       let min = 0;
       let max = 0;
       const start = Math.floor(i * samplesPerPixel);
@@ -45,14 +54,15 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
         if (val > max) max = val;
       }
       
-      ctx.moveTo(i, amp + min * amp);
-      ctx.lineTo(i, amp + max * amp);
+      const px = PADDING + i;
+      ctx.moveTo(px, amp + min * amp);
+      ctx.lineTo(px, amp + max * amp);
     }
     ctx.stroke();
 
     // Draw zoom overlay
-    const startX = zoomRange[0] * width;
-    const endX = zoomRange[1] * width;
+    const startX = toX(zoomRange[0]);
+    const endX = toX(zoomRange[1]);
 
     // Semi-transparent box
     ctx.fillStyle = 'rgba(0, 102, 255, 0.1)';
@@ -64,7 +74,7 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
     ctx.strokeRect(startX, 0, endX - startX, height);
 
     // Handles with Grips
-    const drawHandle = (x: number, side: 'left' | 'right') => {
+    const drawHandle = (x: number) => {
       ctx.save();
       
       // Vertical line
@@ -100,41 +110,85 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
       ctx.restore();
     };
 
-    drawHandle(startX, 'left');
-    drawHandle(endX, 'right');
+    drawHandle(startX);
+    drawHandle(endX);
 
-  }, [audioBuffer, zoomRange]);
+    // Draw L/R locators
+    const duration = audioBuffer.length / sampleRate; 
+    
+    const drawLocator = (time: number, label: string) => {
+      const lx = toX(time / duration);
+      ctx.save();
+      ctx.strokeStyle = '#000000'; // Solid black
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(lx, 0);
+      ctx.lineTo(lx, height);
+      ctx.stroke();
+      // Small triangle
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      if (label === 'L') {
+        ctx.moveTo(lx, 0); ctx.lineTo(lx + 8, 0); ctx.lineTo(lx, 6);
+      } else {
+        ctx.moveTo(lx, 0); ctx.lineTo(lx - 8, 0); ctx.lineTo(lx, 6);
+      }
+      ctx.fill();
+      ctx.restore();
+    };
+    drawLocator(loopRange[0], 'L');
+    drawLocator(loopRange[1], 'R');
+
+  }, [audioBuffer, zoomRange, loopRange, sampleRate]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
+    const width = rect.width;
+    const drawWidth = width - (PADDING * 2 * (width / 1200)); // Scaled padding
+    const xRatio = (e.clientX - rect.left - (PADDING * (width / 1200))) / drawWidth;
+    
     const startX = zoomRange[0];
     const endX = zoomRange[1];
-    const threshold = 15 / rect.width; // Increased threshold for larger handles
+    const threshold = 20 / drawWidth; // Increased threshold
 
     let type: 'left' | 'right' | 'center' | null = null;
-    if (Math.abs(x - startX) < threshold) type = 'left';
-    else if (Math.abs(x - endX) < threshold) type = 'right';
-    else if (x > startX && x < endX) type = 'center';
+    if (Math.abs(xRatio - startX) < threshold) type = 'left';
+    else if (Math.abs(xRatio - endX) < threshold) type = 'right';
+    else if (xRatio > startX && xRatio < endX) type = 'center';
 
     if (!type) return;
     setIsDragging(type);
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newX = Math.max(0, Math.min(1, (moveEvent.clientX - rect.left) / rect.width));
+      const currentRect = canvas.getBoundingClientRect();
+      const currentWidth = currentRect.width;
+      const currentDrawWidth = currentWidth - (PADDING * 2 * (currentWidth / 1200));
+      let newRatio = (moveEvent.clientX - currentRect.left - (PADDING * (currentWidth / 1200))) / currentDrawWidth;
+      newRatio = Math.max(0, Math.min(1, newRatio));
+
+      const duration = audioBuffer!.length / sampleRate; 
+      const snapThreshold = 0.04; // 4% of width - more liberal
+      const lNorm = loopRange[0] / duration;
+      const rNorm = loopRange[1] / duration;
+
+      // Snapping logic
+      if (!moveEvent.shiftKey && (type === 'left' || type === 'right')) {
+        if (Math.abs(newRatio - lNorm) < snapThreshold) newRatio = lNorm;
+        else if (Math.abs(newRatio - rNorm) < snapThreshold) newRatio = rNorm;
+      }
       
       setZoomRange(prev => {
         let [start, end] = prev;
         if (type === 'left') {
-          start = Math.min(newX, end - 0.01);
+          start = Math.min(newRatio, end - 0.01);
         } else if (type === 'right') {
-          end = Math.max(newX, start + 0.01);
+          end = Math.max(newRatio, start + 0.01);
         } else if (type === 'center') {
           const width = end - start;
-          start = Math.max(0, Math.min(1 - width, newX - width / 2));
+          start = Math.max(0, Math.min(1 - width, newRatio - width / 2));
           end = start + width;
         }
         return [start, end];
@@ -160,7 +214,6 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
         className={`w-full h-[40px] rounded bg-white bg-opacity-50 transition-all ${
           isDragging ? 'cursor-grabbing' : 'cursor-grab'
         }`}
-        style={{ overflow: 'visible' }}
         onMouseDown={handleMouseDown}
       />
     </div>

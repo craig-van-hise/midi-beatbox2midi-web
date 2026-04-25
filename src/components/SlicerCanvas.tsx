@@ -6,6 +6,7 @@ interface SlicerCanvasProps {
   audioBuffer: Float32Array | null;
   renderableHits: any[];
   zoomRange: [number, number];
+  setZoomRange: React.Dispatch<React.SetStateAction<[number, number]>>;
   activeTool: Tool;
   onHitAction: (sampleIndex: number, action: 'toggle-lock' | 'toggle-mute' | 'add' | 'remove' | 'toggle-select') => void;
   selectedHitIndices: number[];
@@ -22,6 +23,7 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
   audioBuffer,
   renderableHits,
   zoomRange,
+  setZoomRange,
   activeTool,
   onHitAction,
   selectedHitIndices,
@@ -37,6 +39,68 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
   const [hoverSample, setHoverSample] = useState<number | null>(null);
   const [hoveredHitIndex, setHoveredHitIndex] = useState<number | null>(null);
   const [marquee, setMarquee] = useState<{ start: { x: number, y: number }, end: { x: number, y: number } } | null>(null);
+
+  // Phase 2: Trackpad Scroll Zoom
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault(); // Stop page scroll
+      const rect = canvas.getBoundingClientRect();
+      const mouseXRatio = (e.clientX - rect.left) / rect.width;
+      const zoomSpeed = 0.001; // Adjust for trackpad sensitivity
+      
+      // e.deltaY > 0 is zoom out, e.deltaY < 0 is zoom in
+      const zoomDelta = e.deltaY * zoomSpeed;
+
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        // Horizontal Scroll
+        const scrollSpeed = 0.001;
+        const delta = e.deltaX * scrollSpeed;
+        setZoomRange(prev => {
+          const width = prev[1] - prev[0];
+          let newStart = prev[0] + delta;
+          let newEnd = prev[1] + delta;
+          
+          if (newStart < 0) {
+            newStart = 0;
+            newEnd = width;
+          } else if (newEnd > 1) {
+            newEnd = 1;
+            newStart = 1 - width;
+          }
+          
+          return [newStart, newEnd];
+        });
+      } else {
+        // Anchor-based Zoom
+        setZoomRange(prev => {
+          const currentRange = prev[1] - prev[0];
+          // Prevent zooming in too close
+          if (zoomDelta < 0 && currentRange < 0.01) return prev;
+
+          let newStart = prev[0] - (zoomDelta * mouseXRatio);
+          let newEnd = prev[1] + (zoomDelta * (1 - mouseXRatio));
+
+          // Clamp bounds
+          newStart = Math.max(0, newStart);
+          newEnd = Math.min(1, newEnd);
+          
+          // Prevent flipping or too small range
+          if (newEnd - newStart < 0.005) {
+            const center = prev[0] + currentRange * mouseXRatio;
+            newStart = Math.max(0, center - 0.0025);
+            newEnd = Math.min(1, center + 0.0025);
+          }
+          return [newStart, newEnd];
+        });
+      }
+    };
+
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', handleWheel);
+  }, [setZoomRange]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -279,6 +343,7 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
           let [lStart, lEnd] = prev;
           if (draggingLocator === 'left') lStart = Math.max(0, Math.min(finalTime, lEnd - 0.05));
           else lEnd = Math.max(lStart + 0.05, Math.min(finalTime, totalSamples / sampleRate));
+          
           return [lStart, lEnd] as [number, number];
         });
       } else if (isMarqueePossible && wasDragged) {
@@ -291,7 +356,12 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
       const my = upEvent.clientY - rect.top;
 
       if (draggingLocator) {
-        // Done dragging locator, do nothing else
+        // Final sync of zoom handles to locators after dragging is complete
+        setLoopRange((final: [number, number]) => {
+          const duration = audioBuffer.length / sampleRate;
+          setZoomRange([final[0] / duration, final[1] / duration]);
+          return final;
+        });
       } else if (isMarqueePossible && wasDragged) {
         const mx1 = Math.min(x, mx);
         const mx2 = Math.max(x, mx);

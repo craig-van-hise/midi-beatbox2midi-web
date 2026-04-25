@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useHitManager, HitState } from './hooks/useHitManager';
 import { useAudioPlayback } from './hooks/useAudioPlayback';
 import { Controls } from './components/Controls';
@@ -42,32 +42,115 @@ const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<Tool>('pointer');
   const [tempo, setTempo] = useState(120.000);
 
+  const stateRef = useRef({
+    selectedHitIndices,
+    audioBuffer,
+    renderableHits,
+    sampleRate,
+    currentTime,
+    batchToggleHitState,
+    toggleHitState,
+    playSlice,
+    togglePlay,
+    setSelectedHitIndices
+  });
+
+  useEffect(() => {
+    stateRef.current = {
+      selectedHitIndices,
+      audioBuffer,
+      renderableHits,
+      sampleRate,
+      currentTime,
+      batchToggleHitState,
+      toggleHitState,
+      playSlice,
+      togglePlay,
+      setSelectedHitIndices
+    };
+  }, [selectedHitIndices, audioBuffer, renderableHits, sampleRate, currentTime, batchToggleHitState, toggleHitState, playSlice, togglePlay, setSelectedHitIndices]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if user is focused on an input
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      const { 
+        audioBuffer, renderableHits, sampleRate, currentTime, 
+        selectedHitIndices, batchToggleHitState, toggleHitState, 
+        playSlice, togglePlay, setSelectedHitIndices 
+      } = stateRef.current;
 
       if (e.code === 'Space') {
         e.preventDefault();
         togglePlay();
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedHitIndices.length > 0) {
+          e.preventDefault();
           batchToggleHitState(selectedHitIndices, 'muted');
           setSelectedHitIndices([]);
         }
       } else if (e.key.toLowerCase() === 'm') {
         if (selectedHitIndices.length > 0) {
+          e.preventDefault();
           batchToggleHitState(selectedHitIndices, 'muted');
         }
       } else if (e.key.toLowerCase() === 'l') {
         if (selectedHitIndices.length > 0) {
+          e.preventDefault();
           batchToggleHitState(selectedHitIndices, 'locked');
+        }
+      } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        if (!audioBuffer) return;
+        
+        const activeHits = renderableHits.filter((h: any) => h.state !== 'muted').sort((a: any, b: any) => a.sampleIndex - b.sampleIndex);
+        if (activeHits.length === 0) return;
+
+        const playheadSamples = Math.round(currentTime * sampleRate);
+        
+        let currentHitIdx = -1;
+        for (let i = 0; i < activeHits.length; i++) {
+          if (activeHits[i].sampleIndex <= playheadSamples + 2) {
+            currentHitIdx = i;
+          } else {
+            break;
+          }
+        }
+
+        if (e.key === 'ArrowUp' && currentHitIdx >= 0) {
+          toggleHitState(activeHits[currentHitIdx].sampleIndex, 'locked');
+        } 
+        else if (e.key === 'ArrowDown' && currentHitIdx >= 0) {
+          toggleHitState(activeHits[currentHitIdx].sampleIndex, 'muted');
+        } 
+        else if (e.key === 'ArrowLeft') {
+          const prevHitIdx = currentHitIdx - 1;
+          if (prevHitIdx >= 0) {
+            const start = activeHits[prevHitIdx].sampleIndex / sampleRate;
+            const end = activeHits[currentHitIdx].sampleIndex / sampleRate;
+            playSlice(start, end);
+          } else if (currentHitIdx === 0) {
+            playSlice(0, activeHits[0].sampleIndex / sampleRate);
+          }
+        } 
+        else if (e.key === 'ArrowRight') {
+          const nextHitIdx = currentHitIdx + 1;
+          if (nextHitIdx < activeHits.length) {
+            const start = activeHits[nextHitIdx].sampleIndex / sampleRate;
+            const end = (nextHitIdx + 1 < activeHits.length) 
+              ? activeHits[nextHitIdx + 1].sampleIndex / sampleRate 
+              : audioBuffer.length / sampleRate;
+            playSlice(start, end);
+          }
         }
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedHitIndices, batchToggleHitState, setSelectedHitIndices]);
+
+    // Use capture phase to ensure we catch events before focused UI elements
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -142,7 +225,7 @@ const App: React.FC = () => {
       </header>
 
       <main 
-        className="flex-1 overflow-hidden"
+        className="flex-1 overflow-y-auto overflow-x-hidden pr-2"
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
         onDrop={(e) => {
           e.preventDefault(); e.stopPropagation();
@@ -158,6 +241,8 @@ const App: React.FC = () => {
           audioBuffer={audioBuffer} 
           zoomRange={zoomRange} 
           setZoomRange={setZoomRange} 
+          loopRange={loopRange}
+          sampleRate={sampleRate}
         />
 
         <div className="glass rounded-xl overflow-hidden shadow-inner flex flex-col">
@@ -182,6 +267,7 @@ const App: React.FC = () => {
             audioBuffer={audioBuffer}
             renderableHits={renderableHits}
             zoomRange={zoomRange}
+            setZoomRange={setZoomRange}
             activeTool={activeTool}
             onHitAction={handleHitAction}
             selectedHitIndices={selectedHitIndices}
