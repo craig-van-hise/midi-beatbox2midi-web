@@ -1,5 +1,7 @@
 # Beatbox2MIDI - Transient Slicer
 
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/craig-van-hise/midi-beatbox2midi-web)
+
 A modern web application for slicing beatbox recordings into MIDI transients using a C++ DSP engine compiled to WebAssembly.
 
 ## Project Structure
