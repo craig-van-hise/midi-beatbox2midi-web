@@ -88,7 +88,9 @@ const App: React.FC = () => {
     toggleHitState,
     playSlice,
     togglePlay,
-    setSelectedHitIndices
+    setSelectedHitIndices,
+    loopRange,
+    seek
   });
 
   useEffect(() => {
@@ -102,9 +104,11 @@ const App: React.FC = () => {
       toggleHitState,
       playSlice,
       togglePlay,
-      setSelectedHitIndices
+      setSelectedHitIndices,
+      loopRange,
+      seek
     };
-  }, [selectedHitIndices, audioBuffer, renderableHits, sampleRate, currentTime, batchToggleHitState, toggleHitState, playSlice, togglePlay, setSelectedHitIndices]);
+  }, [selectedHitIndices, audioBuffer, renderableHits, sampleRate, currentTime, batchToggleHitState, toggleHitState, playSlice, togglePlay, setSelectedHitIndices, loopRange, seek]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -116,6 +120,11 @@ const App: React.FC = () => {
         selectedHitIndices, batchToggleHitState, toggleHitState, 
         playSlice, togglePlay, setSelectedHitIndices 
       } = stateRef.current;
+
+      if (e.key === 'Escape') {
+        setSelectedHitIndices([]);
+        return;
+      }
 
       if (e.code === 'Space') {
         e.preventDefault();
@@ -130,55 +139,68 @@ const App: React.FC = () => {
         if (selectedHitIndices.length > 0) {
           e.preventDefault();
           batchToggleHitState(selectedHitIndices, 'muted');
+          setSelectedHitIndices([]);
         }
       } else if (e.key.toLowerCase() === 'l') {
         if (selectedHitIndices.length > 0) {
           e.preventDefault();
           batchToggleHitState(selectedHitIndices, 'locked');
+          setSelectedHitIndices([]);
         }
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault();
         if (!audioBuffer) return;
-        
-        const activeHits = renderableHits.filter((h: any) => h.state !== 'muted').sort((a: any, b: any) => a.sampleIndex - b.sampleIndex);
-        if (activeHits.length === 0) return;
 
-        const playheadSamples = Math.round(currentTime * sampleRate);
-        
-        let currentHitIdx = -1;
-        for (let i = 0; i < activeHits.length; i++) {
-          if (activeHits[i].sampleIndex <= playheadSamples + 2) {
-            currentHitIdx = i;
-          } else {
+        const { 
+          audioBuffer: buf, renderableHits: hits, sampleRate: sr, currentTime: ct, 
+          selectedHitIndices: sel, batchToggleHitState: batch, toggleHitState: toggle, 
+          playSlice: play, loopRange: loop, setSelectedHitIndices: setSel, seek: doSeek
+        } = stateRef.current;
+
+        const lBound = loop[0];
+        const rBound = loop[1];
+        // Include ALL hits (including muted) in boundaries to allow toggling
+        const allHits = hits.sort((a: any, b: any) => a.sampleIndex - b.sampleIndex);
+
+        const sliceBoundaries: { time: number, hitIndex?: number }[] = [{ time: lBound }];
+        allHits.forEach((h: any) => {
+          const t = h.sampleIndex / sr;
+          if (t > lBound + 0.002 && t < rBound - 0.002) {
+            sliceBoundaries.push({ time: t, hitIndex: h.sampleIndex });
+          }
+        });
+        sliceBoundaries.push({ time: rBound });
+
+        // Find current slice
+        let currentSliceIdx = 0;
+        for (let i = 0; i < sliceBoundaries.length - 1; i++) {
+          if (ct >= sliceBoundaries[i].time - 0.005 && ct < sliceBoundaries[i+1].time - 0.005) {
+            currentSliceIdx = i;
             break;
           }
         }
 
-        if (e.key === 'ArrowUp' && currentHitIdx >= 0) {
-          toggleHitState(activeHits[currentHitIdx].sampleIndex, 'locked');
-        } 
-        else if (e.key === 'ArrowDown' && currentHitIdx >= 0) {
-          toggleHitState(activeHits[currentHitIdx].sampleIndex, 'muted');
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+          const currentBoundary = sliceBoundaries[currentSliceIdx];
+          if (currentBoundary.hitIndex !== undefined) {
+            const newState = e.key === 'ArrowUp' ? 'locked' : 'muted';
+            toggle(currentBoundary.hitIndex, newState);
+            setSel(prev => prev.filter(idx => idx !== currentBoundary.hitIndex));
+          }
         } 
         else if (e.key === 'ArrowLeft') {
-          const prevHitIdx = currentHitIdx - 1;
-          if (prevHitIdx >= 0) {
-            const start = activeHits[prevHitIdx].sampleIndex / sampleRate;
-            const end = activeHits[currentHitIdx].sampleIndex / sampleRate;
-            playSlice(start, end);
-          } else if (currentHitIdx === 0) {
-            playSlice(0, activeHits[0].sampleIndex / sampleRate);
-          }
+          let targetIdx = currentSliceIdx - 1;
+          if (targetIdx < 0) targetIdx = sliceBoundaries.length - 2;
+          const start = sliceBoundaries[targetIdx].time;
+          const end = sliceBoundaries[targetIdx + 1].time;
+          play(start, end, undefined, true);
         } 
         else if (e.key === 'ArrowRight') {
-          const nextHitIdx = currentHitIdx + 1;
-          if (nextHitIdx < activeHits.length) {
-            const start = activeHits[nextHitIdx].sampleIndex / sampleRate;
-            const end = (nextHitIdx + 1 < activeHits.length) 
-              ? activeHits[nextHitIdx + 1].sampleIndex / sampleRate 
-              : audioBuffer.length / sampleRate;
-            playSlice(start, end);
-          }
+          let targetIdx = currentSliceIdx + 1;
+          if (targetIdx > sliceBoundaries.length - 2) targetIdx = 0;
+          const start = sliceBoundaries[targetIdx].time;
+          const end = sliceBoundaries[targetIdx + 1].time;
+          play(start, end, undefined, true);
         }
       }
     };
@@ -197,9 +219,11 @@ const App: React.FC = () => {
     switch (action) {
       case 'toggle-lock':
         toggleHitState(sampleIndex, 'locked');
+        setSelectedHitIndices(prev => prev.filter(idx => idx !== sampleIndex));
         break;
       case 'toggle-mute':
         toggleHitState(sampleIndex, 'muted');
+        setSelectedHitIndices(prev => prev.filter(idx => idx !== sampleIndex));
         break;
       case 'add':
         toggleHitState(sampleIndex, 'user-added');

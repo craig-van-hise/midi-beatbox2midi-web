@@ -16,7 +16,7 @@ interface SlicerCanvasProps {
   sampleRate: number;
   loopRange: [number, number]; // in seconds
   setLoopRange: React.Dispatch<React.SetStateAction<[number, number]>>;
-  playSlice: (startTime: number, endTime: number) => void;
+  playSlice: (startTime: number, endTime: number, onComplete?: () => void, returnToStart?: boolean) => void;
 }
 
 export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
@@ -152,9 +152,9 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
       if (x < 0 || x > width) return;
 
       let color = isSelected ? '#FF8C00' : '#0066ff'; // orange if selected, blue default
-      if (hit.state === 'muted') color = '#808080';
-      else if (hit.state === 'locked' || hit.state === 'user-added') {
-        if (!isSelected) color = '#0066ff';
+      if (hit.state === 'muted' && !isSelected) color = '#808080';
+      else if ((hit.state === 'locked' || hit.state === 'user-added') && !isSelected) {
+        color = '#0066ff';
       }
 
       if (isHovered && !isSelected) {
@@ -193,9 +193,12 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
         
         const px = x - 5;
         const py = 5;
-        ctx.fillRect(px, py, 10, 7); // body
+        // Erase line behind lock
+        ctx.clearRect(px - 2, py - 4, 14, 14);
+
+        ctx.fillRect(px - 1, py, 12, 8); // body
         ctx.beginPath();
-        ctx.arc(x, py, 4, Math.PI, 0); // shackle
+        ctx.arc(x, py, 5, Math.PI, 0); // shackle
         ctx.stroke();
       }
 
@@ -307,10 +310,21 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
     const mouseTime = (startSample + (x / rect.width) * visibleSamples) / sampleRate;
 
     // Check for locator dragging
-    const threshold = 15 / rect.width * (visibleSamples / sampleRate);
+    const lineThresholdPx = 4; // strictly 4 pixels wide for the line
+    const lineThreshold = (lineThresholdPx / rect.width) * (visibleSamples / sampleRate);
+    const lTime = loopRange[0];
+    const rTime = loopRange[1];
+    const lX = ((lTime * sampleRate - startSample) / visibleSamples) * rect.width;
+    const rX = ((rTime * sampleRate - startSample) / visibleSamples) * rect.width;
+
+    const isLeftLine = Math.abs(mouseTime - lTime) < lineThreshold;
+    const isRightLine = Math.abs(mouseTime - rTime) < lineThreshold;
+    const isLeftTriangle = y <= 16 && x >= lX && x <= lX + 24;
+    const isRightTriangle = y <= 16 && x <= rX && x >= rX - 24;
+
     let draggingLocator: 'left' | 'right' | null = null;
-    if (Math.abs(mouseTime - loopRange[0]) < threshold) draggingLocator = 'left';
-    else if (Math.abs(mouseTime - loopRange[1]) < threshold) draggingLocator = 'right';
+    if (isLeftLine || isLeftTriangle) draggingLocator = 'left';
+    else if (isRightLine || isRightTriangle) draggingLocator = 'right';
 
     let isMarqueePossible = (activeTool === 'pointer' && hoveredHitIndex === null && !draggingLocator);
     let wasDragged = false;
@@ -382,7 +396,24 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
         const clickedSample = Math.floor(startSample + (mx / rect.width) * visibleSamples);
         const clickedTime = clickedSample / sampleRate;
 
-        if (activeTool === 'audition') {
+        // NEW: Check if click was in the top hitzone (triangles/locks)
+        // Restricted to top zone ONLY for pointer tool
+        const isHitZone = (activeTool === 'pointer') ? (my <= 20) : true;
+
+        const tolerancePx = activeTool === 'pointer' ? 8 : 10;
+        const toleranceSamples = (visibleSamples / rect.width) * tolerancePx;
+        let nearestHit = isHitZone ? renderableHits.find(h => Math.abs(h.sampleIndex - clickedSample) < toleranceSamples) : null;
+        
+        if (activeTool === 'pencil') {
+          onHitAction(clickedSample, 'add');
+        } else if (nearestHit) {
+          if (activeTool === 'eraser') onHitAction(nearestHit.sampleIndex, 'toggle-mute');
+          else if (activeTool === 'lock') onHitAction(nearestHit.sampleIndex, 'toggle-lock');
+          else if (activeTool === 'pointer') onHitAction(nearestHit.sampleIndex, 'toggle-select');
+        } else if (activeTool === 'pointer') {
+          // Negative space click: deselect and audition
+          setSelectedHitIndices([]);
+          
           const sortedHits = [...renderableHits].sort((a, b) => a.sampleIndex - b.sampleIndex);
           let sliceStart = 0;
           let sliceEnd = audioBuffer.length / sampleRate;
@@ -391,19 +422,7 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
             if (hitTime < clickedTime) sliceStart = hitTime;
             else { sliceEnd = hitTime; break; }
           }
-          playSlice(sliceStart, sliceEnd);
-        } else {
-          const tolerancePx = activeTool === 'pointer' ? 8 : 10;
-          const toleranceSamples = (visibleSamples / rect.width) * tolerancePx;
-          let nearestHit = renderableHits.find(h => Math.abs(h.sampleIndex - clickedSample) < toleranceSamples);
-          
-          if (activeTool === 'pencil') {
-            onHitAction(clickedSample, 'add');
-          } else if (nearestHit) {
-            if (activeTool === 'eraser') onHitAction(nearestHit.sampleIndex, 'toggle-mute');
-            else if (activeTool === 'lock') onHitAction(nearestHit.sampleIndex, 'toggle-lock');
-            else if (activeTool === 'pointer') onHitAction(nearestHit.sampleIndex, 'toggle-select');
-          }
+          playSlice(sliceStart, sliceEnd, undefined, true);
         }
       }
 
@@ -421,6 +440,7 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
     if (!canvas || !audioBuffer) return;
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
     const [startRatio, endRatio] = zoomRange;
     const totalSamples = audioBuffer.length;
@@ -432,26 +452,31 @@ export const SlicerCanvas: React.FC<SlicerCanvasProps> = ({
 
     // Context-Aware Hitbox Hover Detection
     let foundHit: number | null = null;
-    const tolerancePx = activeTool === 'pointer' ? 8 : 10;
-    const toleranceSamples = (visibleSamples / rect.width) * tolerancePx;
+    const isHitZone = (activeTool === 'pointer') ? (y <= 20) : true;
+    
+    if (isHitZone) {
+      const tolerancePx = activeTool === 'pointer' ? 8 : 10;
+      const toleranceSamples = (visibleSamples / rect.width) * tolerancePx;
 
-    renderableHits.forEach(hit => {
-      const dist = Math.abs(hit.sampleIndex - currentSample);
-      if (dist < toleranceSamples) {
-        foundHit = hit.sampleIndex;
-      }
-    });
+      renderableHits.forEach(hit => {
+        const dist = Math.abs(hit.sampleIndex - currentSample);
+        if (dist < toleranceSamples) {
+          foundHit = hit.sampleIndex;
+        }
+      });
+    }
     setHoveredHitIndex(foundHit);
   };
 
   const getCursor = () => {
+    if (isPlaying) {
+      return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='orange' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='11 5 6 9 2 9 2 15 6 15 11 19 11 5'%3E%3C/polygon%3E%3Cpath d='M19.07 4.93a10 10 0 0 1 0 14.14'%3E%3C/path%3E%3Cpath d='M15.54 8.46a5 5 0 0 1 0 7.07'%3E%3C/path%3E%3C/svg%3E") 12 12, auto`;
+    }
     switch (activeTool) {
       case 'eraser':
         return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='red' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='18' y1='6' x2='6' y2='18'%3E%3C/line%3E%3Cline x1='6' y1='6' x2='18' y2='18'%3E%3C/line%3E%3C/svg%3E") 12 12, crosshair`;
       case 'lock':
         return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='blue' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2' ry='2'%3E%3C/rect%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'%3E%3C/path%3E%3C/svg%3E") 12 12, auto`;
-      case 'audition':
-        return `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='orange' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='11 5 6 9 2 9 2 15 6 15 11 19 11 5'%3E%3C/polygon%3E%3Cpath d='M19.07 4.93a10 10 0 0 1 0 14.14'%3E%3C/path%3E%3Cpath d='M15.54 8.46a5 5 0 0 1 0 7.07'%3E%3C/path%3E%3C/svg%3E") 12 12, auto`;
       case 'pencil':
         return 'crosshair';
       default:

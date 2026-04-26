@@ -16,7 +16,7 @@ export function useHitManager() {
   const [hitStates, setHitStates] = useState<Map<number, HitState>>(new Map());
   const [selectedHitIndices, setSelectedHitIndices] = useState<number[]>([]);
   const [params, setParams] = useState({
-    sensitivity: 0.500,
+    sensitivity: 0.800,
     noiseFloor: 0.02,
     refractory: 40, // ms
   });

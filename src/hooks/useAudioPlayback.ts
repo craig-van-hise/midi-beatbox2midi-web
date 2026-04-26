@@ -148,7 +148,7 @@ export function useAudioPlayback(
     };
   }, [audioBuffer, isLooping, loopRange, currentTime, tempo]);
 
-  const playSlice = useCallback((startTime: number, endTime: number) => {
+  const playSlice = useCallback((startTime: number, endTime: number, onComplete?: () => void, returnToStart: boolean = false) => {
     if (!audioCtxRef.current || !audioBuffer) return;
 
     // Stop previous
@@ -159,7 +159,7 @@ export function useAudioPlayback(
     source.connect(audioCtxRef.current.destination);
 
     const now = audioCtxRef.current.currentTime;
-    const duration = endTime - startTime;
+    const duration = Math.max(0, endTime - startTime);
     
     source.start(now, startTime);
     source.stop(now + duration);
@@ -173,6 +173,13 @@ export function useAudioPlayback(
       if (sourceRef.current === source) {
         sourceRef.current = null;
         setIsPlaying(false);
+        
+        if (returnToStart) {
+          setCurrentTime(startTime);
+          offsetRef.current = startTime;
+        }
+
+        if (onComplete) onComplete();
       }
     };
   }, [audioBuffer]);
