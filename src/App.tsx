@@ -7,7 +7,7 @@ import { RulerCanvas } from './components/RulerCanvas';
 import { SlicerCanvas } from './components/SlicerCanvas';
 import { Toolbar, Tool } from './components/Toolbar';
 import { Transport } from './components/Transport';
-import { Upload, Music, Settings, Info, AlertCircle } from 'lucide-react';
+import { Upload, Music, Settings, Info, AlertCircle, Mic, FileAudio, Radio } from 'lucide-react';
 
 const App: React.FC = () => {
   const {
@@ -25,6 +25,12 @@ const App: React.FC = () => {
     sampleRate,
   } = useHitManager();
 
+  const [zoomRange, setZoomRange] = useState<[number, number]>([0, 1]);
+  const [activeTool, setActiveTool] = useState<Tool>('pointer');
+  const [tempo, setTempo] = useState(120.000);
+  const [timeSignature, setTimeSignature] = useState<[number, number]>([4, 4]);
+  const [metronomeEnabled, setMetronomeEnabled] = useState(false);
+
   const {
     isPlaying,
     currentTime,
@@ -36,11 +42,41 @@ const App: React.FC = () => {
     playSlice,
     returnToZero,
     seek,
-  } = useAudioPlayback(fullAudioBuffer);
+  } = useAudioPlayback(fullAudioBuffer, metronomeEnabled, tempo, timeSignature);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [isRecordingMic, setIsRecordingMic] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
 
-  const [zoomRange, setZoomRange] = useState<[number, number]>([0, 1]);
-  const [activeTool, setActiveTool] = useState<Tool>('pointer');
-  const [tempo, setTempo] = useState(120.000);
+  const startMicRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        const file = new File([audioBlob], "recorded_audio.wav", { type: 'audio/wav' });
+        loadFile(file);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecordingMic(true);
+    } catch (err) {
+      console.error("Microphone access denied or failed", err);
+    }
+  };
+
+  const stopMicRecording = () => {
+    mediaRecorderRef.current?.stop();
+    setIsRecordingMic(false);
+  };
 
   const stateRef = useRef({
     selectedHitIndices,
@@ -225,66 +261,122 @@ const App: React.FC = () => {
       </header>
 
       <main 
-        className="flex-1 overflow-y-auto overflow-x-hidden pr-2"
-        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        className="flex-1 overflow-hidden relative"
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingOver(true); }}
+        onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingOver(false); }}
         onDrop={(e) => {
-          e.preventDefault(); e.stopPropagation();
+          e.preventDefault(); e.stopPropagation(); setIsDraggingOver(false);
           const file = e.dataTransfer.files?.[0];
           if (file && (file.type.startsWith('audio/') || file.name.endsWith('.wav'))) {
             loadFile(file);
           }
         }}
       >
-        <Controls params={params} setParams={setParams} />
+        {!audioBuffer ? (
+          <div className={`h-full min-h-[400px] flex flex-col items-center justify-center border-4 border-dashed rounded-3xl transition-all duration-300 p-12 ${
+            isDraggingOver 
+              ? 'border-hit-blue bg-blue-50 bg-opacity-50 scale-[0.99] shadow-inner' 
+              : 'border-slate-200 bg-slate-50'
+          }`}>
+            <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-8 transition-transform duration-500 ${isDraggingOver ? 'scale-110' : ''}`}>
+              {isDraggingOver ? (
+                <FileAudio size={48} className="text-hit-blue animate-bounce" />
+              ) : (
+                <div className="relative">
+                  <div className="relative bg-white p-6 rounded-full shadow-lg border border-slate-100">
+                    <Music size={32} className="text-hit-blue" />
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight mb-3">
+              Ready to Slice?
+            </h2>
+            <p className="text-slate-500 font-medium mb-10 text-center max-w-md">
+              Drag & Drop .WAV files here or use your microphone to start slicing your beats.
+            </p>
 
-        <WaveformMinimap 
-          audioBuffer={audioBuffer} 
-          zoomRange={zoomRange} 
-          setZoomRange={setZoomRange} 
-          loopRange={loopRange}
-          sampleRate={sampleRate}
-        />
+            <div className="flex items-center gap-4 flex-wrap justify-center">
+              <label className="flex items-center gap-3 bg-white border-2 border-slate-200 px-8 py-4 rounded-2xl cursor-pointer hover:border-hit-blue hover:text-hit-blue transition-all shadow-sm font-bold text-slate-600">
+                <Upload size={20} />
+                <span>Browse Files</span>
+                <input type="file" accept="audio/*" onChange={handleFileChange} className="hidden" />
+              </label>
 
-        <div className="glass rounded-xl overflow-hidden shadow-inner flex flex-col">
-          <div className="px-4 py-2 bg-white bg-opacity-40 flex items-center justify-between border-b border-slate-200">
-            <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} />
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              Workspace
+              <button 
+                onClick={isRecordingMic ? stopMicRecording : startMicRecording}
+                className={`flex items-center gap-3 px-8 py-4 rounded-2xl transition-all font-bold shadow-sm ${
+                  isRecordingMic 
+                    ? 'bg-red-500 text-white animate-pulse' 
+                    : 'bg-slate-800 text-white hover:bg-slate-700'
+                }`}
+              >
+                {isRecordingMic ? <Radio size={20} /> : <Mic size={20} />}
+                <span>{isRecordingMic ? 'Stop Recording' : 'Record Mic'}</span>
+              </button>
             </div>
           </div>
-          
-          <RulerCanvas 
-            zoomRange={zoomRange}
-            totalSamples={audioBuffer?.length || 0}
-            sampleRate={sampleRate}
-            tempo={tempo}
-            timeSignature={[4, 4]}
-            loopRange={loopRange}
-            onSeek={seek}
-          />
+        ) : (
+          <div className="flex flex-col gap-4 h-full overflow-y-auto overflow-x-hidden pr-2">
+            <Controls params={params} setParams={setParams} />
 
-          <SlicerCanvas 
-            audioBuffer={audioBuffer}
-            renderableHits={renderableHits}
-            zoomRange={zoomRange}
-            setZoomRange={setZoomRange}
-            activeTool={activeTool}
-            onHitAction={handleHitAction}
-            selectedHitIndices={selectedHitIndices}
-            setSelectedHitIndices={setSelectedHitIndices}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            sampleRate={sampleRate}
-            loopRange={loopRange}
-            setLoopRange={setLoopRange}
-            playSlice={playSlice}
-          />
-        </div>
+            <WaveformMinimap 
+              audioBuffer={audioBuffer} 
+              zoomRange={zoomRange} 
+              setZoomRange={setZoomRange} 
+              loopRange={loopRange}
+              sampleRate={sampleRate}
+            />
+
+            <div className="glass rounded-xl overflow-hidden shadow-inner flex flex-col">
+              <div className="px-4 py-2 bg-white bg-opacity-40 flex items-center justify-between border-b border-slate-200">
+                <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} />
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Workspace
+                </div>
+              </div>
+              
+              <RulerCanvas 
+                zoomRange={zoomRange}
+                totalSamples={audioBuffer?.length || 0}
+                sampleRate={sampleRate}
+                tempo={tempo}
+                timeSignature={timeSignature}
+                loopRange={loopRange}
+                onSeek={seek}
+              />
+
+              <SlicerCanvas 
+                audioBuffer={audioBuffer}
+                renderableHits={renderableHits}
+                zoomRange={zoomRange}
+                setZoomRange={setZoomRange}
+                activeTool={activeTool}
+                onHitAction={handleHitAction}
+                selectedHitIndices={selectedHitIndices}
+                setSelectedHitIndices={setSelectedHitIndices}
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+                sampleRate={sampleRate}
+                loopRange={loopRange}
+                setLoopRange={setLoopRange}
+                playSlice={playSlice}
+              />
+            </div>
+          </div>
+        )}
       </main>
 
       <Transport 
         tempo={tempo}
         setTempo={setTempo}
+        timeSignature={timeSignature}
+        setTimeSignature={setTimeSignature}
+        metronomeEnabled={metronomeEnabled}
+        setMetronomeEnabled={setMetronomeEnabled}
+        isRecording={isRecordingMic}
+        toggleRecording={isRecordingMic ? stopMicRecording : startMicRecording}
         isPlaying={isPlaying}
         setIsPlaying={togglePlay}
         isLooping={isLooping}

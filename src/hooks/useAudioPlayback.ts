@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export function useAudioPlayback(audioBuffer: AudioBuffer | null) {
+export function useAudioPlayback(
+  audioBuffer: AudioBuffer | null,
+  metronomeEnabled: boolean = false,
+  tempo: number = 120,
+  timeSignature: [number, number] = [4, 4]
+) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [loopRange, setLoopRange] = useState<[number, number]>([0, 0]); // in seconds
@@ -11,6 +16,7 @@ export function useAudioPlayback(audioBuffer: AudioBuffer | null) {
   const startTimeRef = useRef(0);
   const offsetRef = useRef(0);
   const animationFrameRef = useRef(0);
+  const lastBeatRef = useRef(-1);
 
   // Initialize AudioContext
   useEffect(() => {
@@ -50,9 +56,42 @@ export function useAudioPlayback(audioBuffer: AudioBuffer | null) {
       }
     }
 
+    // Metronome logic
+    const beatsPerSecond = tempo / 60;
+    const currentBeatExact = current * beatsPerSecond;
+    const currentBeatInt = Math.floor(currentBeatExact);
+
+    if (metronomeEnabled && currentBeatInt > lastBeatRef.current) {
+      lastBeatRef.current = currentBeatInt;
+      
+      // Synthesize a click
+      if (audioCtxRef.current) {
+        const osc = audioCtxRef.current.createOscillator();
+        const gain = audioCtxRef.current.createGain();
+        
+        // High pitch on downbeat, lower pitch on other beats
+        const isDownbeat = currentBeatInt % timeSignature[0] === 0;
+        osc.frequency.value = isDownbeat ? 1200 : 800; 
+        
+        osc.connect(gain);
+        gain.connect(audioCtxRef.current.destination);
+        
+        const clickTime = audioCtxRef.current.currentTime;
+        osc.start(clickTime);
+        gain.gain.setValueAtTime(0.5, clickTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.1);
+        osc.stop(clickTime + 0.1);
+      }
+    }
+    
+    // Reset lastBeatRef if we loop back
+    if (isLooping && currentBeatInt < lastBeatRef.current) {
+       lastBeatRef.current = -1;
+    }
+
     setCurrentTime(current);
     animationFrameRef.current = requestAnimationFrame(updatePlayhead);
-  }, [isPlaying, isLooping, loopRange, audioBuffer]);
+  }, [isPlaying, isLooping, loopRange, audioBuffer, metronomeEnabled, tempo, timeSignature]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -94,6 +133,9 @@ export function useAudioPlayback(audioBuffer: AudioBuffer | null) {
       if (start < loopRange[0] || start >= loopRange[1]) start = loopRange[0];
     }
 
+    // Reset metronome beat tracker
+    lastBeatRef.current = Math.floor(start * (tempo / 60)) - 1;
+
     source.start(0, start);
     sourceRef.current = source;
     
@@ -104,7 +146,7 @@ export function useAudioPlayback(audioBuffer: AudioBuffer | null) {
     source.onended = () => {
       if (!isLooping) setIsPlaying(false);
     };
-  }, [audioBuffer, isLooping, loopRange, currentTime]);
+  }, [audioBuffer, isLooping, loopRange, currentTime, tempo]);
 
   const playSlice = useCallback((startTime: number, endTime: number) => {
     if (!audioCtxRef.current || !audioBuffer) return;
@@ -139,6 +181,7 @@ export function useAudioPlayback(audioBuffer: AudioBuffer | null) {
     sourceRef.current?.stop();
     sourceRef.current = null;
     setIsPlaying(false);
+    lastBeatRef.current = -1;
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -149,6 +192,7 @@ export function useAudioPlayback(audioBuffer: AudioBuffer | null) {
   const returnToZero = useCallback(() => {
     const target = isLooping ? loopRange[0] : 0;
     setCurrentTime(target);
+    lastBeatRef.current = -1;
     if (isPlaying) {
       play(target);
     }
@@ -159,11 +203,12 @@ export function useAudioPlayback(audioBuffer: AudioBuffer | null) {
     const target = Math.max(0, Math.min(time, audioBuffer.duration));
     setCurrentTime(target);
     offsetRef.current = target;
+    lastBeatRef.current = Math.floor(target * (tempo / 60)) - 1;
     
     if (isPlaying) {
       play(target);
     }
-  }, [audioBuffer, isPlaying, play]);
+  }, [audioBuffer, isPlaying, play, tempo]);
 
   return {
     isPlaying,
