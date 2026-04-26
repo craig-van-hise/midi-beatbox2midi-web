@@ -15,6 +15,8 @@ interface TransportProps {
   isLooping: boolean;
   setIsLooping: (l: boolean) => void;
   onRTZ: () => void;
+  gridPulse: '8th' | '16th' | '32nd';
+  setGridPulse: (gp: '8th' | '16th' | '32nd') => void;
   currentTime: number;
 }
 
@@ -32,6 +34,8 @@ export const Transport: React.FC<TransportProps> = ({
   isLooping,
   setIsLooping,
   onRTZ,
+  gridPulse,
+  setGridPulse,
   currentTime,
 }) => {
   const tapTimesRef = useRef<number[]>([]);
@@ -68,7 +72,7 @@ export const Transport: React.FC<TransportProps> = ({
           {/* Time Signature */}
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-1">Time Sig</span>
-            <div className="flex items-center gap-1 font-mono font-bold text-slate-700">
+            <div className="flex items-center gap-1 font-bold text-slate-700 tabular-nums">
               <input
                 type="number"
                 value={timeSignature[0]}
@@ -87,6 +91,22 @@ export const Transport: React.FC<TransportProps> = ({
 
           <div className="h-8 w-[1px] bg-slate-200" />
 
+          {/* Grid Pulse */}
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-1">Grid</span>
+            <select 
+              value={gridPulse} 
+              onChange={(e) => setGridPulse(e.target.value as '8th' | '16th' | '32nd')}
+              className="bg-transparent border border-slate-300 rounded p-0.5 text-xs font-bold focus:ring-0"
+            >
+              <option value="8th">8th</option>
+              <option value="16th">16th</option>
+              <option value="32nd">32nd</option>
+            </select>
+          </div>
+
+          <div className="h-8 w-[1px] bg-slate-200" />
+
           {/* Tempo */}
           <div className="flex items-center gap-3">
             <Music size={18} className="text-slate-400" />
@@ -98,7 +118,7 @@ export const Transport: React.FC<TransportProps> = ({
                   step="0.001"
                   value={tempo}
                   onChange={(e) => setTempo(parseFloat(e.target.value))}
-                  className="bg-transparent border-none p-0 text-lg font-mono font-bold focus:ring-0 w-20 h-6"
+                  className="bg-transparent border-none p-0 text-lg font-bold focus:ring-0 w-20 h-6 tabular-nums"
                 />
                 <div className="flex items-center gap-2">
                   <input
@@ -182,7 +202,7 @@ export const Transport: React.FC<TransportProps> = ({
         {/* Time Display (Right) */}
         <div className="flex-1 flex flex-col items-end min-w-[120px]">
           <span className="text-[10px] font-bold text-slate-400 uppercase leading-none mb-1">Time</span>
-          <span className="text-lg font-mono font-bold text-slate-700 tabular-nums">
+          <span className="text-lg font-bold text-slate-700 tabular-nums">
             {formatTime(currentTime)}
           </span>
         </div>

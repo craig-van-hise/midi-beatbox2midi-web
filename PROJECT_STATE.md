@@ -22,33 +22,36 @@ src/
 - **Core**: React 18, TypeScript, Vite
 - **DSP**: C++ WASM (compiled via Emscripten)
 - **Audio**: Web Audio API (AudioBufferSourceNode, AudioContext)
-- **UI**: Tailwind CSS, Lucide-React
-- **Icons**: Music, Sliders, Zap, VolumeX, Timer, Play, Square, Repeat
+- **UI**: Tailwind CSS, Lucide-React, Glassmorphism
+- **Icons**: Music, Sliders, Zap, VolumeX, Timer, Play, Square, Repeat, Mic, Upload, FileAudio
 
 ## 3. System Capabilities & Status
 
 ### Audio Engine [STABLE]
-- [x] High-fidelity WAV/Audio decoding.
-- [x] Mono-summing during import.
+- [x] High-fidelity WAV/Audio decoding & Mono-summing.
 - [x] Synced playhead tracking with `requestAnimationFrame`.
-- [x] Looping playback with interactive locators.
+- [x] Looping playback with interactive locators (draggable flags/poles).
+- [x] **Audition Engine**: "In Situ" slice previewing with auto-return playhead logic.
 
 ### DSP Engine (WASM) [STABLE]
-- [x] Transient detection via Energy/Onset algorithm.
-- [x] Memory-efficient data transfer (Direct HEAP access).
-- [x] **Parameter Control**: Sensitivity, Noise Floor, and Refractory sliders are fully operational.
-- [x] **True Zero Sensitivity**: Implemented normalized sensitivity scaling (0.0-1.0) with global flux peak tracking for a "True Zero" hit threshold.
+- [x] Transient detection via Energy/Onset algorithm with memory-efficient HEAP access.
+- [x] **Normalized Thresholding**: Sensitivity (0-1.0) mapped to backend flux peaks for "True Zero" hits.
+- [x] **Parameter Control**: Real-time updates for Sensitivity, Noise Floor, and Refractory periods.
 
-### Visualizer & Interaction [WIP]
-- [x] Multi-level waveform rendering (Minimap + Main Canvas).
-- [x] Viewport zooming and scrolling.
-- [ ] **Interaction Tools**: Pointer/Marquee, Eraser, and Lock tool logic in `SlicerCanvas.tsx` is pending completion.
-- [ ] **UI Polish**: Loop locators need full-height lines, top-aligned triangles, and 'L/R' labels.
+### Visualizer & Interaction [STABLE]
+- [x] Multi-level waveform rendering (Minimap + Main Canvas) with trackpad zoom/scroll.
+- [x] **Precision Interaction**: Pointer tool restricted to top zone; Eraser/Lock tools full-height.
+- [x] **Navigation**: Loop-aware arrow key navigation with 5ms epsilon and wrap-around logic.
+- [x] **Marquee Selection**: Multi-hit selection with distinct orange highlighting for muted/active hits.
+
+### Onboarding & Transport [STABLE]
+- [x] **Empty State Dropzone**: Drag-and-drop WAV support with visual feedback.
+- [x] **Microphone Pipeline**: Direct recording from system mic into the slicer.
+- [x] **Global Transport**: Integrated tempo, time signature, and metronome controls.
 
 ## 4. Current Work-in-Progress
-**Transient Interaction & UI Polish**:
-- Implementing tool logic in `SlicerCanvas.tsx` (Marquee, Eraser, Lock).
-- Polishing Loop Locator UI components for better visual feedback.
+- [ ] **MIDI Export**: Implementing the logic to convert transient boundaries into MIDI file/stream.
+- [ ] **UI Polish**: Finalizing glassmorphism transitions and responsive layout refinements.
 
 ## 5. Recent Evolution
-The system was recently enhanced with a robust sensitivity control system. We transitioned to a normalized 0.0-1.0 UI scale and implemented "True Zero" thresholding in the C++ engine, which tracks the global maximum flux to guarantee zero hits at the lowest sensitivity setting. Previous issues with disconnected parameter sliders have been resolved.
+The system has matured from a DSP prototype into a high-fidelity interaction surface. Recent updates added a robust Audition Engine for "in situ" slice previewing and a precision arrow-navigation system that respects loop boundaries. We also implemented a dedicated onboarding flow with drag-and-drop support and a microphone recording pipeline, completing the core lifecycle from input to interaction.

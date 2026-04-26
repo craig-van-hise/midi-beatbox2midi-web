@@ -5,6 +5,7 @@ import { Controls } from './components/Controls';
 import { WaveformMinimap } from './components/WaveformMinimap';
 import { RulerCanvas } from './components/RulerCanvas';
 import { SlicerCanvas } from './components/SlicerCanvas';
+import { TimeSigCanvas } from './components/TimeSigCanvas';
 import { Toolbar, Tool } from './components/Toolbar';
 import { Transport } from './components/Transport';
 import { Upload, Music, Settings, Info, AlertCircle, Mic, FileAudio, Radio } from 'lucide-react';
@@ -29,6 +30,7 @@ const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<Tool>('pointer');
   const [tempo, setTempo] = useState(120.000);
   const [timeSignature, setTimeSignature] = useState<[number, number]>([4, 4]);
+  const [gridPulse, setGridPulse] = useState<'8th' | '16th' | '32nd'>('16th');
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
 
   const {
@@ -251,8 +253,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pb-20 px-6 pt-4 max-w-[1400px] mx-auto flex flex-col gap-4">
-      <header className="flex items-center justify-between py-2 border-b border-slate-100">
+    <div className="min-h-screen bg-slate-100 pb-20 px-6 pt-3 max-w-[1400px] mx-auto flex flex-col gap-2.5 antialiased text-slate-800">
+      <header className="flex items-center justify-between py-1 border-b border-slate-200">
         <div className="flex items-center gap-4">
           <div className="w-8 h-8 bg-hit-blue rounded-lg flex items-center justify-center text-white shadow-md">
             <Music size={18} />
@@ -268,7 +270,7 @@ const App: React.FC = () => {
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors shadow-sm mr-2">
             <Upload size={16} className="text-slate-400" />
-            <span className="text-xs font-bold text-slate-600">Import</span>
+            <span className="text-xs font-bold text-slate-700">Import</span>
             <input type="file" accept="audio/*" onChange={handleFileChange} className="hidden" />
           </label>
           
@@ -342,51 +344,101 @@ const App: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-4 h-full overflow-y-auto overflow-x-hidden pr-2">
-            <Controls params={params} setParams={setParams} />
+          <div className="p-0 overflow-visible flex flex-col gap-2.5">
+            <div className="bg-white shadow-lg rounded-xl overflow-hidden">
+              <Controls params={params} setParams={setParams} />
+            </div>
 
-            <WaveformMinimap 
-              audioBuffer={audioBuffer} 
-              zoomRange={zoomRange} 
-              setZoomRange={setZoomRange} 
-              loopRange={loopRange}
-              sampleRate={sampleRate}
-            />
+            <div className="bg-white border border-slate-300 shadow-[0_4px_12px_rgba(0,0,0,0.08)] rounded-xl overflow-hidden flex flex-row">
+              {/* Left Label Lane */}
+              <div className="w-24 bg-slate-50 border-r border-slate-200 flex items-center justify-center p-2 shrink-0">
+                <span className="text-sm font-semibold text-slate-800 text-center">Overview</span>
+              </div>
+              {/* Right Content Lane */}
+              <div className="flex-1 overflow-hidden">
+                <WaveformMinimap 
+                  audioBuffer={audioBuffer} 
+                  zoomRange={zoomRange} 
+                  setZoomRange={setZoomRange} 
+                  loopRange={loopRange}
+                  sampleRate={sampleRate}
+                />
+              </div>
+            </div>
 
-            <div className="glass rounded-xl overflow-hidden shadow-inner flex flex-col">
-              <div className="px-4 py-2 bg-white bg-opacity-40 flex items-center justify-between border-b border-slate-200">
+            <div className="bg-white border border-slate-300 shadow-[0_4px_12px_rgba(0,0,0,0.08)] rounded-xl overflow-hidden flex flex-col">
+              {/* Top Toolbar */}
+              <div className="px-4 py-1 bg-slate-50 flex items-center justify-between border-b border-slate-200">
                 <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} />
                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                   Workspace
                 </div>
               </div>
               
-              <RulerCanvas 
-                zoomRange={zoomRange}
-                totalSamples={audioBuffer?.length || 0}
-                sampleRate={sampleRate}
-                tempo={tempo}
-                timeSignature={timeSignature}
-                loopRange={loopRange}
-                onSeek={seek}
-              />
+              {/* 2-Column Split Area */}
+              <div className="flex flex-row flex-1">
+                {/* Left Label Column */}
+                <div className="w-24 bg-slate-50 border-r-2 border-slate-600 flex flex-col shrink-0">
+                  {/* Lane A: Time Signature (Interactive) */}
+                  <div className="h-[40px] border-b-2 border-slate-600 flex items-center justify-center px-1">
+                    <span className="text-sm font-semibold text-slate-800 text-center leading-tight">Time Signature</span>
+                  </div>
+                  {/* Lane B: Bars & Beats (RulerCanvas height) */}
+                  <div className="h-[40px] border-b-2 border-slate-600 flex items-center justify-center px-1">
+                    <span className="text-sm font-semibold text-slate-800 text-center leading-tight">Bars and Beats</span>
+                  </div>
+                  {/* Lane C: Audio (Remaining) */}
+                  <div className="flex-1 flex items-center justify-center px-1">
+                    <span className="text-sm font-semibold text-slate-800 text-center">Audio</span>
+                  </div>
+                </div>
 
-              <SlicerCanvas 
-                audioBuffer={audioBuffer}
-                renderableHits={renderableHits}
-                zoomRange={zoomRange}
-                setZoomRange={setZoomRange}
-                activeTool={activeTool}
-                onHitAction={handleHitAction}
-                selectedHitIndices={selectedHitIndices}
-                setSelectedHitIndices={setSelectedHitIndices}
-                isPlaying={isPlaying}
-                currentTime={currentTime}
-                sampleRate={sampleRate}
-                loopRange={loopRange}
-                setLoopRange={setLoopRange}
-                playSlice={playSlice}
-              />
+                {/* Right Content Column (Canvases) */}
+                <div className="flex-1 flex flex-col overflow-hidden relative border-x-2 border-slate-600">
+                  {/* Time Sig Lane (Interactive) */}
+                  <div className="h-[40px] bg-white border-b-2 border-slate-600 w-full overflow-hidden">
+                    <TimeSigCanvas 
+                      zoomRange={zoomRange}
+                      totalSamples={audioBuffer?.length || 0}
+                      sampleRate={sampleRate}
+                      tempo={tempo}
+                      timeSignature={timeSignature}
+                      setTimeSignature={setTimeSignature}
+                    />
+                  </div>
+                  
+                  <RulerCanvas 
+                    zoomRange={zoomRange}
+                    totalSamples={audioBuffer?.length || 0}
+                    sampleRate={sampleRate}
+                    tempo={tempo}
+                    timeSignature={timeSignature}
+                    gridPulse={gridPulse}
+                    loopRange={loopRange}
+                    onSeek={seek}
+                  />
+
+                  <SlicerCanvas 
+                    audioBuffer={audioBuffer}
+                    renderableHits={renderableHits}
+                    zoomRange={zoomRange}
+                    setZoomRange={setZoomRange}
+                    activeTool={activeTool}
+                    onHitAction={handleHitAction}
+                    selectedHitIndices={selectedHitIndices}
+                    setSelectedHitIndices={setSelectedHitIndices}
+                    isPlaying={isPlaying}
+                    currentTime={currentTime}
+                    sampleRate={sampleRate}
+                    loopRange={loopRange}
+                    setLoopRange={setLoopRange}
+                    playSlice={playSlice}
+                    tempo={tempo}
+                    timeSignature={timeSignature}
+                    gridPulse={gridPulse}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -397,6 +449,8 @@ const App: React.FC = () => {
         setTempo={setTempo}
         timeSignature={timeSignature}
         setTimeSignature={setTimeSignature}
+        gridPulse={gridPulse}
+        setGridPulse={setGridPulse}
         metronomeEnabled={metronomeEnabled}
         setMetronomeEnabled={setMetronomeEnabled}
         isRecording={isRecordingMic}

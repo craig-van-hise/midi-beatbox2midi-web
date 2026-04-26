@@ -206,7 +206,7 @@ export const WaveformMinimap: React.FC<WaveformMinimapProps> = ({
   };
 
   return (
-    <div className="glass rounded-xl p-2 mb-3 overflow-visible">
+    <div className="p-2 overflow-visible">
       <canvas
         ref={canvasRef}
         width={1200}

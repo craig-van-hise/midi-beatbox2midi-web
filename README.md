@@ -4,6 +4,12 @@
 
 A modern web application for slicing beatbox recordings into MIDI transients using a C++ DSP engine compiled to WebAssembly.
 
+## Features
+- **WASM DSP**: Real-time transient detection using a high-performance C++ engine.
+- **Precision Slicing**: Advanced interaction model with Marquee selection, Lock/Mute tools, and "In Situ" auditioning.
+- **Onboarding**: Drag & Drop landing zone and direct microphone recording pipeline.
+- **Transport**: Full-featured transport with tempo, time signature, metronome, and loop locators.
+
 ## Project Structure
 ```
 .

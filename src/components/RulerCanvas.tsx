@@ -7,6 +7,7 @@ interface RulerCanvasProps {
   tempo: number;
   timeSignature: [number, number];
   loopRange: [number, number];
+  gridPulse: '8th' | '16th' | '32nd';
   onSeek: (time: number) => void;
 }
 
@@ -17,14 +18,14 @@ export const RulerCanvas: React.FC<RulerCanvasProps> = ({
   tempo,
   timeSignature,
   loopRange,
+  gridPulse,
   onSeek,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const draw = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -33,53 +34,87 @@ export const RulerCanvas: React.FC<RulerCanvasProps> = ({
     ctx.clearRect(0, 0, width, height);
 
     const [startRatio, endRatio] = zoomRange;
-    const startSample = startRatio * totalSamples;
-    const endSample = endRatio * totalSamples;
-    const visibleSamples = endSample - startSample;
+    
+    // Unified math matching TimeSigCanvas
+    const effectiveTotalSamples = totalSamples > 0 ? totalSamples : (sampleRate * 120);
+    const visibleSamples = effectiveTotalSamples * (endRatio - startRatio);
+    const startSample = effectiveTotalSamples * startRatio;
 
     if (visibleSamples <= 0 || sampleRate <= 0 || tempo <= 0) return;
 
+    // Use a pure white background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    const beatsPerMeasure = timeSignature[0];
     const beatsPerSecond = tempo / 60;
     const samplesPerBeat = sampleRate / beatsPerSecond;
-    const [num, den] = timeSignature;
-    const samplesPerMeasure = samplesPerBeat * num;
-
-    // Draw grid lines and text
-    ctx.strokeStyle = '#94a3b8'; // slate-400
-    ctx.fillStyle = '#64748b'; // slate-500
-    ctx.font = '10px Inter';
-    ctx.textAlign = 'left';
+    const samplesPerMeasure = samplesPerBeat * beatsPerMeasure;
+    
+    const gridDivisionsPerBeat = gridPulse === '8th' ? 2 : gridPulse === '16th' ? 4 : 8;
+    const samplesPerGrid = samplesPerBeat / gridDivisionsPerBeat;
 
     const startMeasure = Math.floor(startSample / samplesPerMeasure);
-    const endMeasure = Math.ceil(endSample / samplesPerMeasure);
+    const endMeasure = startMeasure + Math.ceil(visibleSamples / samplesPerMeasure) + 1;
 
     for (let m = startMeasure; m <= endMeasure; m++) {
       const measureSample = m * samplesPerMeasure;
-      const x = ((measureSample - startSample) / visibleSamples) * width;
-
-      if (x >= 0 && x <= width) {
-        ctx.beginPath();
-        ctx.moveTo(x, height);
-        ctx.lineTo(x, height - 15);
-        ctx.stroke();
-        ctx.fillText(`M${m + 1}`, x + 4, 12);
-      }
-
-      // Sub-beats
-      for (let b = 1; b < num; b++) {
-        const beatSample = measureSample + b * samplesPerBeat;
-        const bx = ((beatSample - startSample) / visibleSamples) * width;
-        if (bx >= 0 && bx <= width) {
+      
+      // Loop through grid pulses within this measure
+      for (let g = 0; g < beatsPerMeasure * gridDivisionsPerBeat; g++) {
+        const tickSample = measureSample + (g * samplesPerGrid);
+        const x = ((tickSample - startSample) / visibleSamples) * width;
+        
+        if (x >= 0 && x <= width) {
           ctx.beginPath();
-          ctx.moveTo(bx, height);
-          ctx.lineTo(bx, height - 8);
-          ctx.stroke();
+          
+          if (g === 0) {
+            // TIER 1: Bar Line (BOLD Black)
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2.5;
+            const lx = Math.round(x) + 0.5;
+            ctx.moveTo(lx, height);
+            ctx.lineTo(lx, 0); // Full height
+            ctx.stroke();
+          } else if (g % gridDivisionsPerBeat === 0) {
+            // TIER 2: Beat Line (Medium Slate)
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 1.5;
+            const lx = Math.round(x) + 0.5;
+            ctx.moveTo(lx, height);
+            ctx.lineTo(lx, height - 20); 
+            ctx.stroke();
+          } else {
+            // TIER 3: Grid Pulse (Light Slate)
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 1;
+            const lx = Math.floor(x) + 0.5;
+            ctx.moveTo(lx, height);
+            ctx.lineTo(lx, height - 12);
+            ctx.stroke();
+          }
         }
       }
     }
+  };
 
-    // No loop locators here anymore, they are in SlicerCanvas
-  }, [zoomRange, totalSamples, sampleRate, tempo, timeSignature, loopRange]);
+  useEffect(() => {
+    draw();
+    const resizeObserver = new ResizeObserver(() => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+        draw();
+      }
+    });
+    if (canvasRef.current) resizeObserver.observe(canvasRef.current);
+    return () => resizeObserver.disconnect();
+  }, [zoomRange, totalSamples, sampleRate, tempo, timeSignature, gridPulse]);
+
+  useEffect(() => {
+    draw();
+  }, [zoomRange, totalSamples, sampleRate, tempo, timeSignature, gridPulse]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const canvas = canvasRef.current;
@@ -87,19 +122,20 @@ export const RulerCanvas: React.FC<RulerCanvasProps> = ({
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const [startRatio, endRatio] = zoomRange;
-    const visibleSamples = (endRatio - startRatio) * totalSamples;
-    const clickedSample = startRatio * totalSamples + (x / rect.width) * visibleSamples;
+    const effectiveTotalSamples = totalSamples > 0 ? totalSamples : (sampleRate * 120);
+    const visibleSamples = (endRatio - startRatio) * effectiveTotalSamples;
+    const clickedSample = startRatio * effectiveTotalSamples + (x / rect.width) * visibleSamples;
     const clickedTime = clickedSample / sampleRate;
     onSeek(clickedTime);
   };
 
   return (
-    <canvas
-      ref={canvasRef}
-      width={1200}
-      height={24}
-      className="w-full h-[24px] bg-slate-200 border-b border-slate-300 cursor-pointer"
-      onMouseDown={handleMouseDown}
-    />
+    <div className="relative border-b-2 border-slate-600">
+      <canvas
+        ref={canvasRef}
+        className="w-full h-[40px] cursor-pointer"
+        onMouseDown={handleMouseDown}
+      />
+    </div>
   );
 };

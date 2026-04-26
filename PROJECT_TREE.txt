@@ -1,14 +1,21 @@
 
 /Users/vv2024/Documents/Repos - vv2024/WebApps/midi/midi-beatbox2midi-web
 ├── # Prompts
-|  ├── # 1.md
-|  ├── # 2.md
-|  ├── # 3.md
-|  ├── # 4.md
-|  ├── # 5.md
-|  ├── # 6.md
-|  ├── # 7.md
+|  ├── # 13.md
+|  ├── # 14.md
 |  └── xOlder
+|     ├── # 1.md
+|     ├── # 10.md
+|     ├── # 11.md
+|     ├── # 12.md
+|     ├── # 2.md
+|     ├── # 3.md
+|     ├── # 4.md
+|     ├── # 5.md
+|     ├── # 6.md
+|     ├── # 7.md
+|     ├── # 8.md
+|     ├── # 9.md
 |     ├── # Prompt for AI Studio v2.md
 |     ├── # Prompt for AI Studio.md
 |     ├── # demo HPD.md
@@ -38,8 +45,12 @@
 ├── PROJECT_STATE.md
 ├── PROJECT_TREE.txt
 ├── README.md
-├── diagnostic report WASM params.md
-├── diganostic report parameter updates.md
+├── Reports
+|  ├── 2026-04-26_Slicer_Interaction_Refinement_Report.md
+|  ├── brief 2.md
+|  ├── brief.md
+|  ├── diagnostic report WASM params.md
+|  └── diganostic report parameter updates.md
 ├── index.html
 ├── llms.txt
 ├── package-lock.json
@@ -78,9 +89,9 @@
 ├── tsconfig.node.json
 └── vite.config.ts
 
-directory: 415 file: 2838
+directory: 417 file: 2853
 
-ignored: directory (33)
+ignored: directory (34)
 
 
 [2K[1G

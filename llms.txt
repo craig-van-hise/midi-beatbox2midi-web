@@ -3,11 +3,14 @@
 Comprehensive tool for slicing beatbox transients into MIDI.
 
 ## Core Documentation
-- [Project State](PROJECT_STATE.md): Current architecture, status, and bug tracking.
+- [Project State](PROJECT_STATE.md): Current architecture, status, and system capabilities.
 - [README](README.md): Project overview and quick start.
+- [Slicer interaction Report](Reports/2026-04-26_Slicer_Interaction_Refinement_Report.md): Detailed logic for current interaction model.
 
 ## Key Source
 - [App.tsx](src/App.tsx): Root component and state coordination.
 - [AudioProcessor.js](src/lib/AudioProcessor.js): JS/WASM Bridge.
 - [useHitManager.ts](src/hooks/useHitManager.ts): Core DSP state.
+- [useAudioPlayback.ts](src/hooks/useAudioPlayback.ts): Web Audio Engine.
 - [SlicerCanvas.tsx](src/components/SlicerCanvas.tsx): Primary UI interaction.
+- [Transport.tsx](src/components/Transport.tsx): Transport and Metronome logic.
